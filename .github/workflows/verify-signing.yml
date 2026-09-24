@@ -10,6 +10,9 @@ on:
     # Run weekly on Monday at 08:00 UTC to continuously verify that Certum cloud authentication and certificates remain valid
     - cron: '0 8 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   discover-windows-runners:
     name: Discover Windows Runners
@@ -53,8 +56,8 @@ jobs:
           echo "Discovered Windows runner matrix: $RUNNERS"
           echo "runners=$RUNNERS" >> "$GITHUB_OUTPUT"
 
-  build-sign-verify:
-    name: Build, Sign, and Verify (${{ matrix.os }})
+  build:
+    name: Build Unsigned Binary (${{ matrix.os }})
     needs: discover-windows-runners
     runs-on: ${{ matrix.os }}
     strategy:
@@ -71,7 +74,7 @@ jobs:
           go-version: '>=1.21'
           check-latest: false
 
-      # 1. Generate a small executable using pre-existing GHA tools
+      # Generate executable using zero secrets (isolated build step)
       - name: Generate helloworld.exe
         shell: pwsh
         run: |
@@ -96,7 +99,29 @@ jobs:
           $initialOutput = .\helloworld.exe
           Write-Host "Execution check: $initialOutput"
 
-      # 2. Run Certum codesign action to authenticate
+      - name: Upload Unsigned Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-helloworld-${{ matrix.os }}
+          path: helloworld.exe
+          retention-days: 1
+
+  sign-and-verify:
+    name: Sign & Verify (${{ matrix.os }})
+    needs: [ discover-windows-runners, build ]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJson(needs.discover-windows-runners.outputs.runners) }}
+    steps:
+      - name: Download Unsigned Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: unsigned-helloworld-${{ matrix.os }}
+          path: .
+
+      # Authenticate SimplySign Desktop
       - name: Setup Certum Cloud Code Signing
         id: certum
         uses: jay0lee/certum-cloud-code-sign@main
@@ -106,7 +131,7 @@ jobs:
           cert_sha1: ${{ secrets.CERTUM_CERT_SHA1 }}
           debug: 'true'
 
-      # 3. Sign the new executable
+      # Sign the binary
       - name: Sign Executable
         shell: pwsh
         run: |
@@ -130,7 +155,7 @@ jobs:
           }
           Write-Host "Successfully signed helloworld.exe."
 
-      # 4. Verify the executable is signed with the expected cert
+      # Verify the signature
       - name: Verify Signed Executable
         shell: pwsh
         run: |
@@ -169,6 +194,11 @@ jobs:
           $output = .\helloworld.exe
           Write-Host "Execution Output: $output"
           Write-Host "`n>>> SUCCESS: Executable signed and verified with expected Certum certificate! <<<"
+
+      # Session teardown: cleanly terminates SimplySign Desktop and unmounts certificates
+      - name: Teardown SimplySign Desktop Session
+        if: always()
+        uses: jay0lee/certum-cloud-code-sign/teardown@main
 
       - name: Upload Signed Executable Artifact
         uses: actions/upload-artifact@v4
