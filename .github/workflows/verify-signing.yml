@@ -125,7 +125,7 @@ jobs:
       # Authenticate SimplySign Desktop (pinned to immutable commit SHA)
       - name: Setup Certum Cloud Code Signing
         id: certum
-        uses: jay0lee/certum-cloud-code-sign@396c1ac02de5db9cb6d9bc6194de6092944f69c8 # v1
+        uses: jay0lee/certum-cloud-code-sign@a3324503499c49090869856eeeecfe95fb613d87 # v1
         with:
           username: ${{ secrets.CERTUM_USERNAME }}
           totp_secret: ${{ secrets.CERTUM_TOTP_SECRET }}
@@ -145,8 +145,14 @@ jobs:
           Write-Host "=== Signing helloworld.exe ==="
           Write-Host "Certificate Thumbprint: $thumbprint"
 
-          # signtool is automatically added to GITHUB_PATH by the certum action
-          signtool sign /sha1 $thumbprint `
+          $signtool = "${{ steps.certum.outputs.signtool-path }}"
+          if (-not $signtool -or -not (Test-Path $signtool)) {
+              Write-Error "signtool.exe path not found or invalid: '$signtool'"
+              exit 1
+          }
+          Write-Host "Using SignTool at: $signtool"
+
+          & "$signtool" sign /sha1 $thumbprint `
             /tr http://time.certum.pl /td SHA256 /fd SHA256 /v `
             helloworld.exe
 
@@ -160,8 +166,9 @@ jobs:
       - name: Verify Signed Executable
         shell: pwsh
         run: |
-          Write-Host "=== Verifying Signature via SignTool ==="
-          signtool verify /pa /v helloworld.exe
+          $signtool = "${{ steps.certum.outputs.signtool-path }}"
+          Write-Host "=== Verifying Signature via SignTool ($signtool) ==="
+          & "$signtool" verify /pa /v helloworld.exe
           if ($LASTEXITCODE -ne 0) {
               Write-Error "signtool verify failed!"
               exit $LASTEXITCODE
@@ -199,7 +206,7 @@ jobs:
       # Session teardown: cleanly terminates SimplySign Desktop and unmounts certificates
       - name: Teardown SimplySign Desktop Session
         if: always()
-        uses: jay0lee/certum-cloud-code-sign/teardown@396c1ac02de5db9cb6d9bc6194de6092944f69c8 # v1
+        uses: jay0lee/certum-cloud-code-sign/teardown@a3324503499c49090869856eeeecfe95fb613d87 # v1
 
       - name: Upload Signed Executable Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -22,15 +22,15 @@ The automated workflow in [`.github/workflows/verify-signing.yml`](.github/workf
    - Locates the x64 `signtool.exe` and exports action outputs.
 
 3. **Code Signing**:
-   - Signs `helloworld.exe` using `signtool.exe` with the certificate thumbprint output from the action:
+   - Signs `helloworld.exe` using the explicit `signtool.exe` path and certificate thumbprint returned by the action:
      ```powershell
-     signtool sign /sha1 ${{ steps.certum.outputs.cert-thumbprint }} `
+     & "${{ steps.certum.outputs.signtool-path }}" sign /sha1 ${{ steps.certum.outputs.cert-thumbprint }} `
        /tr http://time.certum.pl /td SHA256 /fd SHA256 /v `
        helloworld.exe
      ```
 
 4. **Comprehensive Signature Verification**:
-   - Verifies the Authenticode signature using `signtool verify /pa /v helloworld.exe`.
+   - Verifies the Authenticode signature using `& "${{ steps.certum.outputs.signtool-path }}" verify /pa /v helloworld.exe`.
    - Verifies the signature status, signer certificate subject, issuer, and timestamp using PowerShell's `Get-AuthenticodeSignature`.
    - Asserts that the signer certificate thumbprint matches the expected certificate output.
    - Executes the signed binary to ensure it was not corrupted by the signing process.
