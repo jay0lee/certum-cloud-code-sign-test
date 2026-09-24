@@ -58,9 +58,9 @@ jobs:
         id: certum
         uses: jay0lee/certum-cloud-code-sign@main
         with:
-          username: ${{ secrets.CERTUM_USERNAME }}
-          totp-secret: ${{ secrets.CERTUM_TOTP_SECRET }}
-          cert-sha1: ${{ secrets.CERTUM_CERT_SHA1 }}
+          username: ${{ secrets.CERTUM_USERNAME || secrets.USERNAME }}
+          totp_secret: ${{ secrets.CERTUM_TOTP_SECRET || secrets.TOTP_SECRET }}
+          cert_sha1: ${{ secrets.CERTUM_CERT_SHA1 || secrets.CERT_SHA1 }}
           debug: 'true'
 
       # 3. Sign the new executable

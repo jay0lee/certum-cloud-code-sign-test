@@ -39,13 +39,16 @@ The automated workflow in [`.github/workflows/verify-signing.yml`](.github/workf
 
 ## Required Secrets
 
-To enable end-to-end verification, set the following GitHub Secrets in this repository (`Settings` > `Secrets and variables` > `Actions`):
+To enable end-to-end verification, set the following GitHub Secrets in this repository (**Settings > Secrets and variables > Actions**):
 
-| Secret | Description |
-| :--- | :--- |
-| `CERTUM_USERNAME` | Your Certum SimplySign account email / username |
-| `CERTUM_TOTP_SECRET` | Your Base32 TOTP secret key for 2FA one-time password generation |
-| `CERTUM_CERT_SHA1` | *(Optional)* Expected certificate SHA-1 thumbprint |
+> [!IMPORTANT]
+> GitHub Secret names **can only contain alphanumeric characters (`[A-Za-z0-9]`) and underscores (`_`)**. Hyphens/dashes (`-`) are not allowed by GitHub.
+
+| Secret Name | Supported Fallback | Description |
+| :--- | :--- | :--- |
+| `CERTUM_USERNAME` | `USERNAME` | Your Certum SimplySign account email / username |
+| `CERTUM_TOTP_SECRET` | `TOTP_SECRET` | Your Base32 TOTP secret key for 2FA one-time password generation |
+| `CERTUM_CERT_SHA1` | `CERT_SHA1` | *(Optional)* Expected certificate SHA-1 thumbprint |
 
 ---
 
