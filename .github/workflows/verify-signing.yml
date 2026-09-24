@@ -1,0 +1,134 @@
+name: Verify Certum Cloud Code Signing
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Monday at 08:00 UTC to continuously verify that Certum cloud authentication and certificates remain valid
+    - cron: '0 8 * * 1'
+
+jobs:
+  build-sign-verify:
+    name: Build, Sign, and Verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, windows-11-arm64 ]
+    steps:
+      - name: Checkout Test Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go Toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.21'
+          check-latest: false
+
+      # 1. Generate a small executable using pre-existing GHA tools
+      - name: Generate helloworld.exe
+        shell: pwsh
+        run: |
+          Write-Host "=== Generating helloworld.exe ==="
+          if (Get-Command go -ErrorAction SilentlyContinue) {
+              Write-Host "Compiling with Go $(go version)..."
+              go build -ldflags="-s -w" -o helloworld.exe main.go
+          } else {
+              Write-Host "Go not found, compiling with pre-installed C# compiler (csc.exe)..."
+              & "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /out:helloworld.exe main.cs
+          }
+
+          if (-not (Test-Path helloworld.exe)) {
+              Write-Error "Failed to produce helloworld.exe"
+              exit 1
+          }
+
+          $fileSize = (Get-Item helloworld.exe).Length
+          Write-Host "Created helloworld.exe ($fileSize bytes)"
+
+          # Test initial execution
+          $initialOutput = .\helloworld.exe
+          Write-Host "Execution check: $initialOutput"
+
+      # 2. Run Certum codesign action to authenticate
+      - name: Setup Certum Cloud Code Signing
+        id: certum
+        uses: jay0lee/certum-cloud-code-sign@main
+        with:
+          username: ${{ secrets.CERTUM_USERNAME }}
+          totp-secret: ${{ secrets.CERTUM_TOTP_SECRET }}
+          cert-sha1: ${{ secrets.CERTUM_CERT_SHA1 }}
+          debug: 'true'
+
+      # 3. Sign the new executable
+      - name: Sign Executable
+        shell: pwsh
+        run: |
+          $thumbprint = "${{ steps.certum.outputs.cert-thumbprint }}"
+          if (-not $thumbprint) {
+              Write-Error "No certificate thumbprint output returned by Certum action!"
+              exit 1
+          }
+
+          Write-Host "=== Signing helloworld.exe ==="
+          Write-Host "Certificate Thumbprint: $thumbprint"
+
+          # signtool is automatically added to GITHUB_PATH by the certum action
+          signtool sign /sha1 $thumbprint `
+            /tr http://time.certum.pl /td SHA256 /fd SHA256 /v `
+            helloworld.exe
+
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "signtool sign failed with exit code $LASTEXITCODE"
+              exit $LASTEXITCODE
+          }
+          Write-Host "Successfully signed helloworld.exe."
+
+      # 4. Verify the executable is signed with the expected cert
+      - name: Verify Signed Executable
+        shell: pwsh
+        run: |
+          Write-Host "=== Verifying Signature via SignTool ==="
+          signtool verify /pa /v helloworld.exe
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "signtool verify failed!"
+              exit $LASTEXITCODE
+          }
+
+          Write-Host "`n=== Verifying Signature via PowerShell Authenticode ==="
+          $sig = Get-AuthenticodeSignature -FilePath helloworld.exe
+          Write-Host "Status        : $($sig.Status)"
+          Write-Host "StatusMessage : $($sig.StatusMessage)"
+          Write-Host "Signer Subject: $($sig.SignerCertificate.Subject)"
+          Write-Host "Signer Issuer : $($sig.SignerCertificate.Issuer)"
+          Write-Host "Signer Thumb  : $($sig.SignerCertificate.Thumbprint)"
+          Write-Host "TimeStamper   : $($sig.TimeStamperCertificate.Subject)"
+
+          # Confirm signature validity
+          if ($sig.Status -ne 'Valid') {
+              Write-Error "Signature status is not 'Valid' (got '$($sig.Status)': $($sig.StatusMessage))"
+              exit 1
+          }
+
+          # Confirm signer certificate matches expected certificate thumbprint
+          $expectedThumb = "${{ steps.certum.outputs.cert-thumbprint }}".ToUpper().Trim()
+          $actualThumb = $sig.SignerCertificate.Thumbprint.ToUpper().Trim()
+
+          if ($expectedThumb -and ($actualThumb -ne $expectedThumb)) {
+              Write-Error "Certificate thumbprint mismatch! Expected: $expectedThumb, Actual: $actualThumb"
+              exit 1
+          }
+
+          Write-Host "`n=== Verifying Signed Binary Execution ==="
+          $output = .\helloworld.exe
+          Write-Host "Execution Output: $output"
+          Write-Host "`n>>> SUCCESS: Executable signed and verified with expected Certum certificate! <<<"
+
+      - name: Upload Signed Executable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helloworld-signed-${{ matrix.os }}
+          path: helloworld.exe

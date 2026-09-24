@@ -1,0 +1,12 @@
+# Binaries
+*.exe
+*.dll
+helloworld
+
+# Logs & Screenshots
+*.log
+*.png
+
+# OS metadata
+.DS_Store
+Thumbs.db
