@@ -1,6 +1,6 @@
 # Certum Cloud Code Signing Test & Verification Repository
 
-This repository tests and validates the reusable [`jay0lee/certum-cloud-code-sign`](https://github.com/jay0lee/certum-cloud-code-sign) GitHub Action across **Windows x86_64** (`windows-latest`) and **Windows ARM64** (`windows-11-arm64`) runners.
+This repository tests and validates the reusable [`jay0lee/certum-cloud-code-sign`](https://github.com/jay0lee/certum-cloud-code-sign) GitHub Action across **Windows x86_64** (`windows-latest`) and **Windows Arm** (`windows-11-arm`) runners.
 
 ---
 
