@@ -125,7 +125,7 @@ jobs:
       # Authenticate SimplySign Desktop (pinned to immutable commit SHA)
       - name: Setup Certum Cloud Code Signing
         id: certum
-        uses: jay0lee/certum-cloud-code-sign@a01c80bd382095b876bf1f9bc7f85ca7a1318b11 # v1
+        uses: jay0lee/certum-cloud-code-sign@396c1ac02de5db9cb6d9bc6194de6092944f69c8 # v1
         with:
           username: ${{ secrets.CERTUM_USERNAME }}
           totp_secret: ${{ secrets.CERTUM_TOTP_SECRET }}
@@ -199,7 +199,7 @@ jobs:
       # Session teardown: cleanly terminates SimplySign Desktop and unmounts certificates
       - name: Teardown SimplySign Desktop Session
         if: always()
-        uses: jay0lee/certum-cloud-code-sign/teardown@a01c80bd382095b876bf1f9bc7f85ca7a1318b11 # v1
+        uses: jay0lee/certum-cloud-code-sign/teardown@396c1ac02de5db9cb6d9bc6194de6092944f69c8 # v1
 
       - name: Upload Signed Executable Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
